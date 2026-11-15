@@ -1,0 +1,228 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>DATA QUEST: Become a Data Scientist!</title>
+<style>
+:root{--bg:#0b1020;--p:#151d3a;--p2:#1e2a52;--tx:#eaf0ff;--mu:#9db0d8;--a:#35e0c2;--b:#ffcb47;--r:#ff6b81}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 20% 0,#1b2a66,#0b1020 60%) fixed;color:var(--tx);font:16px/1.5 "Trebuchet MS",system-ui,sans-serif;min-height:100vh}
+#app{max-width:860px;margin:0 auto;padding:12px}
+h1{font-size:44px;margin:.2em 0;color:var(--a);letter-spacing:2px}h3{margin:.8em 0 .2em;color:var(--b)}
+.card{background:var(--p);border:1px solid var(--p2);border-radius:14px;padding:14px;margin:10px 0}
+button{background:var(--a);color:#06241f;border:0;border-radius:10px;padding:9px 14px;margin:4px;font:700 15px inherit;cursor:pointer}
+button.g{background:var(--p2);color:var(--tx)}button.chip{background:var(--p2);color:var(--tx);border:2px solid var(--a);font-weight:400}button.on{background:var(--b);color:#222}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid var(--b)}
+.hud{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--p);border-radius:14px;padding:8px 12px}
+.hud b{flex:1 1 200px}.bar{height:10px;background:var(--p2);border-radius:6px;flex:1 1 100%;overflow:hidden}.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--a),var(--b))}
+.toast{background:#123a36;border-left:6px solid var(--a);border-radius:10px;padding:10px 14px;margin:10px 0}.toast.bad{background:#3d1722;border-color:var(--r)}
+.win{animation:pop .6s}@keyframes pop{0%{transform:scale(.8);opacity:0}100%{transform:scale(1);opacity:1}}
+table{border-collapse:collapse;width:100%;font-size:14px}td,th{border-bottom:1px solid var(--p2);padding:4px 6px;text-align:left}
+.map{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}.map button{min-height:70px}
+.pad{display:flex;gap:4px;margin:6px 0}.pad button{flex:1;font-size:20px;touch-action:none}
+input[type=range]{width:60%;max-width:300px;accent-color:var(--a)}textarea,select,input[type=text]{background:var(--bg);color:var(--tx);border:1px solid var(--p2);border-radius:8px;padding:6px;max-width:100%}
+svg text{fill:var(--mu);font-size:11px}.big{font-size:56px;text-align:center;animation:pop 1s}
+</style></head><body><div id="app"></div>
+<script>
+/* ===== DATA QUEST: helpers, state, shared UI ===== */
+const $=s=>document.querySelector(s),ri=(a,b)=>a+Math.floor(Math.random()*(b-a+1)),pk=a=>a[ri(0,a.length-1)],sh=a=>[...a].sort(()=>Math.random()-.5);
+const mean=a=>a.reduce((x,y)=>x+y,0)/a.length,vr=a=>{const m=mean(a);return mean(a.map(x=>(x-m)**2))},med=a=>{const s=[...a].sort((x,y)=>x-y),h=s.length>>1;return s.length%2?s[h]:(s[h-1]+s[h])/2};
+const mode=a=>{const c={};a.forEach(x=>c[x]=(c[x]||0)+1);const m=Math.max(...Object.values(c));return Object.keys(c).filter(k=>c[k]==m).join(', ')};
+const nr=(m,s)=>m+s*Math.sqrt(-2*Math.log(1-Math.random()))*Math.cos(6.2832*Math.random()),cl=(v,a,b)=>Math.min(b,Math.max(a,v));
+const fresh=()=>({xp:0,coins:0,done:{},badges:[],ops:0,time:0,acc:0,rate:0,cm:'',rf:''});
+let S;try{S=Object.assign(fresh(),JSON.parse(localStorage.getItem('dq')))}catch(e){S=fresh()}
+let snd=1,t0=Date.now(),paused=0,M={train:[]};
+const save=()=>{S.time+=Date.now()-t0;t0=Date.now();try{localStorage.setItem('dq',JSON.stringify(S))}catch(e){}};
+const beep=f=>{if(!snd)return;try{const a=new(window.AudioContext||webkitAudioContext)(),o=a.createOscillator();o.frequency.value=f;o.connect(a.destination);o.start();o.stop(a.currentTime+.1)}catch(e){}};
+const op=()=>{S.ops++};
+const say=(m,ok)=>{$('#fb').innerHTML=`<div class="toast ${ok===false?'bad':''}">${m}</div>`;beep(ok===false?200:600)};
+function fin(i,m){if(!S.done[i]){S.done[i]=1;S.xp+=100;S.coins+=25;S.badges.push(ST[i].n)}save();beep(880);
+ $('#fb').innerHTML=`<div class="toast win">🏅 ${m}<br><b>+100 XP, +25 coins, badge earned: ${ST[i].n}</b><br><button onclick="${i<9?`stage(${i+1})`:'end()'}">${i<9?'Next stage':'Restore DATA CITY'}</button></div>`}
+const app=$('#app');
+function menu(){document.onkeydown=null;const t=S.xp<300?'Rookie':S.xp<700?'Explorer':'Data Scientist';
+ app.innerHTML=`<div class="card" style="text-align:center"><h1>DATA QUEST</h1><p><b>Become a Data Scientist!</b></p><p>DATA CITY has lost its intelligence because the DATA CORE is corrupted. Complete 10 missions to restore it.</p><p>Player title: <b>${t}</b> | XP <b>${S.xp}</b> | Coins <b>${S.coins}</b> | Badges <b>${S.badges.length}/10</b></p><button onclick="map()">Start Game</button><button class="g" onclick="how()">How to Play</button><button class="g" onclick="this.textContent='Sound: '+((snd=!snd)?'on':'off')">Sound: ${snd?'on':'off'}</button><button class="g" onclick="if(confirm('Reset all progress?')){S=fresh();save();menu()}">Reset progress</button></div>`}
+function map(){document.onkeydown=null;app.innerHTML=`<div class="hud"><b>Choose a stage</b><span>XP ${S.xp}</span><button class="g" onclick="menu()">Menu</button></div><div class="map card">`+ST.map((s,i)=>{const lock=i>0&&!S.done[i-1];return `<button class="${S.done[i]?'':'g'}" ${lock?'disabled':''} onclick="stage(${i})">${S.done[i]?'✅':lock?'🔒':'▶'} ${i+1}. ${s.n}<br><small>${s.c}</small></button>`}).join('')+'</div>'}
+function how(){app.innerHTML='<div class="hud"><b>How to Play</b><button class="g" onclick="menu()">Back</button></div>'+ST.map((s,i)=>`<div class="card"><h3>${i+1}. ${s.n}: ${s.c}</h3><p><b>Objective and controls:</b> ${s.o}</p><p><b>You will learn:</b> ${s.l}</p><p><b>In real life:</b> ${s.r}</p></div>`).join('')}
+function stage(i){paused=0;document.onkeydown=null;app.innerHTML=`<div class="hud"><b>Stage ${i+1}: ${ST[i].n}</b><span>XP ${S.xp}</span><span>Coins ${S.coins}</span><button class="g" onclick="map()">Map</button><button class="g" onclick="stage(${i})">Restart</button><button class="g" onclick="paused=!paused;this.textContent=paused?'Resume':'Pause'">Pause</button><div class="bar"><i style="width:${Object.keys(S.done).length*10}%"></i></div></div><p><b>Objective:</b> ${ST[i].o}</p><div id="st"></div><div id="fb"></div>`;ST[i].run($('#st'))}
+/* shared ML helpers: apple (y=0) vs orange (y=1) with weight w and redness c */
+const fr=y=>y?{w:Math.round(cl(nr(190,28),110,260)),c:+cl(nr(.3,.2),0,1).toFixed(2),y:1}:{w:Math.round(cl(nr(150,28),90,230)),c:+cl(nr(.75,.2),0,1).toFixed(2),y:0};
+const knn=(tr,p,k)=>{const s=tr.map(q=>({d:((q.w-p.w)/60)**2+((q.c-p.c)/.3)**2,y:q.y})).sort((a,b)=>a.d-b.d).slice(0,k);return s.reduce((a,b)=>a+b.y,0)*2>s.length?1:0};
+const nm=f=>f.y?'🍊 orange':'🍎 apple';
+
+/* ===== STAGE 1: Data Collection (canvas, keyboard movement) ===== */
+function s1(el){el.innerHTML='<canvas id="cv" width="480" height="300" style="width:100%;max-width:480px;background:#12331f;border-radius:12px"></canvas><div class="pad">'+[['◀','arrowleft'],['▲','arrowup'],['▼','arrowdown'],['▶','arrowright']].map(([t,k])=>`<button data-k="${k}">${t}</button>`).join('')+'</div><div class="card" id="ds"></div>';
+ const c=$('#cv'),g=c.getContext('2d'),K={};let p={x:240,y:150},D=[],noise=0,it=[];
+ const T=[['🍎',1],['🌡️',1],['🦊',1],['🪨',0],['🗑️',0]];
+ for(let i=0;i<24;i++){const t=T[i<16?i%3:3+i%2];it.push({e:t[0],r:t[1],x:ri(20,460),y:ri(30,280)})}
+ const val=e=>e=='🍎'?ri(90,220)+' g':e=='🌡️'?ri(5,38)+' °C':pk(['fox','deer','owl']),typ=e=>e=='🍎'?'fruit weight':e=='🌡️'?'temperature':'animal sighting';
+ document.onkeydown=e=>{const k=e.key.toLowerCase();K[k]=1;if(k.startsWith('arrow'))e.preventDefault()};document.onkeyup=e=>K[e.key.toLowerCase()]=0;
+ const pad=el.querySelector('.pad');pad.onpointerdown=e=>{if(e.target.dataset.k)K[e.target.dataset.k]=1};pad.onpointerup=pad.onpointerleave=()=>['arrowleft','arrowup','arrowdown','arrowright'].forEach(k=>K[k]=0);
+ const panel=()=>$('#ds').innerHTML=`<b>Live dataset: ${D.length}/10 relevant observations</b> (${noise} irrelevant items ignored)<table><tr><th>#</th><th>Variable</th><th>Value</th></tr>${D.slice(-6).map(r=>`<tr><td>${r.id}</td><td>${r.type}</td><td>${r.value}</td></tr>`).join('')}</table>`;
+ const loop=()=>{if(!c.isConnected)return;if(!paused&&D.length<10){const s=3;if(K.arrowleft||K.a)p.x-=s;if(K.arrowright||K.d)p.x+=s;if(K.arrowup||K.w)p.y-=s;if(K.arrowdown||K.s)p.y+=s;p.x=cl(p.x,12,468);p.y=cl(p.y,15,288);
+  it=it.filter(o=>{if(Math.hypot(o.x-p.x,o.y-p.y)>20)return true;
+   if(o.r){D.push({id:D.length+1,type:typ(o.e),value:val(o.e)});op();D.length==10?fin(0,'Great! You collected 10 observations. In Data Science, gathering relevant observations is called DATA COLLECTION.'):say(`Collected: ${typ(o.e)}. Each observation becomes a row in your dataset. ${10-D.length} more to go.`)}
+   else{noise++;say('That is irrelevant noise, so it does not belong in the dataset. Choosing relevant data matters.',false)}panel();return false});}
+  g.clearRect(0,0,480,300);g.font='22px serif';g.textAlign='center';it.forEach(o=>g.fillText(o.e,o.x,o.y));g.font='28px serif';g.fillText('🧑‍🚀',p.x,p.y);requestAnimationFrame(loop)};
+ panel();loop()}
+
+/* ===== STAGE 2: Data Cleaning, discovered by play: keep the Weather Machine honest ===== */
+function s2(el){const W=640,H=330;let rd=0,lives=3,tool=1,G;
+ const mk=r=>{let sn=1,D=[];const ok=k=>{for(let i=0;i<k;i++)D.push({s:sn++,t:ri(20,30),k:'ok'})};ok(r==0?6:8);
+  if(r==0)D.push({s:sn++,t:9999,k:'bad'},{s:sn++,t:-50,k:'bad'});
+  if(r>=1)D.push({s:sn++,t:null,k:'blank'},{s:sn++,t:null,k:'blank'});
+  if(r==1)D.push({s:sn++,t:9999,k:'bad'});
+  let U=[];if(r==2){U=[{s:sn++,t:38,k:'ok'},{s:sn++,t:39,k:'ok'}];D.push(...U)}
+  const L=sh(D);U.forEach(u=>{L.splice(Math.min(L.length,L.findIndex(x=>x.s==u.s)+ri(2,4)),0,{...u,k:'dup'})});
+  return{L,truth:mean(D.filter(x=>x.k=='ok').map(x=>x.t))}};
+ el.innerHTML=`<canvas id="cv" width="${W}" height="${H}" style="width:100%;max-width:${W}px;background:#0d1530;border-radius:12px;touch-action:none"></canvas><div class="pad"><button id="t1" class="on">🗑️ Throw away a card</button><button id="t2" class="g">🩹 Patch a gap</button></div>`;
+ const c=$('#cv'),g=c.getContext('2d');
+ const sel=n=>{tool=n;$('#t1').className=n==1?'on':'g';$('#t2').className=n==2?'on':'g'};$('#t1').onclick=()=>sel(1);$('#t2').onclick=()=>sel(2);
+ document.onkeydown=e=>{if(e.key=='1')sel(1);if(e.key=='2')sel(2)};
+ const start=()=>{const m=mk(rd);G={L:m.L,truth:m.truth,cards:[],acc:[],tk:0,nxt:0,end:0,log:{bad:[],blank:0,dup:[],lost:0}};
+  say(['Round 1/3: reports roll toward the Weather Machine, which averages them. Keep the needle inside the green zone. Click a card to use the selected tool on it.','Round 2/3: some reports have gaps. Watch what the machine does with them.','Round 3/3: the busiest day. Watch the reports carefully.'][rd])};
+ const mean2=()=>G.acc.length?mean(G.acc.map(a=>a.v)):0;
+ const finish=()=>{G.end=1;const m=mean2(),ok=Math.abs(m-G.truth)<=1,lg=G.log;
+  const why=[...lg.bad.map(v=>`a reading of ${v}°C got through`),...(lg.blank?[`${lg.blank} blank report(s) counted as 0°C`]:[]),...lg.dup.map(s=>`Station ${s} was counted twice`),...(lg.lost?[`you threw away ${lg.lost} good report(s)`]:[])].join('; ');
+  const LRN=['Some reports were impossible, like 9999°C. Removing wrong values keeps results honest. This is DATA CLEANING.','Blank reports were counted as 0°C and dragged the needle down. Patching gaps with a typical value, or removing them, is part of DATA CLEANING.','A station that reports twice gets counted twice, which skews the average. Removing duplicates is part of DATA CLEANING.'][rd];
+  if(ok){if(rd==2)fin(1,`Round 3 clear! ${LRN} You kept the machine honest in all 3 rounds.`);else{$('#fb').innerHTML=`<div class="toast win">⭐ Round ${rd+1} clear! ${LRN}<br><button id="nx">Next round</button></div>`;$('#nx').onclick=()=>{rd++;start()}}}
+  else{lives--;$('#fb').innerHTML=`<div class="toast bad">The needle ended at ${m>=60?'off the scale':m.toFixed(1)+'°C'} but the real temperature is about ${G.truth.toFixed(1)}°C. ${why?'What happened: '+why+'.':''}<br>${lives>0?'<button id="rt">Retry round</button>':'No lives left. <button id="rt">Restart stage</button>'}</div>`;$('#rt').onclick=()=>lives>0?start():stage(1)}};
+ const ingest=()=>{G.cards=G.cards.filter(o=>{if(o.x<W-125)return true;const v=o.t===null?0:o.t,twice=G.acc.some(a=>a.s==o.s);G.acc.push({s:o.s,v});
+  if(o.k=='bad'){G.log.bad.push(o.t);say(`The machine swallowed ${o.t}°C and the needle jumped! Wrong readings poison the average.`,false)}
+  else if(o.t===null){G.log.blank++;say('A blank report was counted as 0°C and the needle dropped!',false)}
+  else if(twice){G.log.dup.push(o.s);say(`Station ${o.s} reported twice, so the machine counted it twice.`,false)}return false})};
+ const draw=()=>{g.clearRect(0,0,W,H);g.fillStyle='#2a3558';g.fillRect(0,95,W,100);g.fillStyle='#7c5cff';g.fillRect(W-120,70,120,150);g.fillStyle='#fff';g.font='bold 14px sans-serif';g.textAlign='center';g.fillText('WEATHER',W-60,138);g.fillText('MACHINE',W-60,158);
+  G.cards.forEach(o=>{g.fillStyle='#e8f0ff';g.fillRect(o.x,o.y,120,80);g.fillStyle='#12204a';g.textAlign='left';g.font='bold 14px sans-serif';g.fillText('Station '+o.s,o.x+8,o.y+24);g.font='13px sans-serif';g.fillText('10:00',o.x+8,o.y+44);g.font='bold 18px sans-serif';g.fillText(o.t===null?'—':o.t+'°C',o.x+8,o.y+68)});
+  const X=v=>30+cl(v,0,60)/60*580,m=mean2();g.fillStyle='#1e2a52';g.fillRect(30,262,580,18);g.fillStyle='rgba(110,231,135,.6)';g.fillRect(X(G.truth-1),256,X(G.truth+1)-X(G.truth-1),30);g.fillStyle='#ffcb47';g.fillRect(X(m)-3,250,6,42);
+  g.fillStyle='#eaf0ff';g.font='14px sans-serif';g.textAlign='left';g.fillText(`Machine says: ${m>=60?'off the scale!':m.toFixed(1)+'°C'}     Lives ${'❤'.repeat(Math.max(0,lives))}     Round ${rd+1}/3`,30,312);g.fillStyle='#9db0d8';g.font='13px sans-serif';g.fillText('Green zone = the real temperature. Stop bad reports before they reach the machine.',10,24)};
+ const loop=()=>{if(!c.isConnected)return;if(!paused&&!G.end){G.tk++;const sp=1.2+.2*rd;if(G.nxt<G.L.length&&G.tk%Math.ceil(135/sp)==1)G.cards.push({...G.L[G.nxt++],x:-125,y:105});G.cards.forEach(o=>o.x+=sp);ingest();if(G.nxt>=G.L.length&&!G.cards.length)finish()}draw();requestAnimationFrame(loop)};
+ c.onpointerdown=e=>{if(paused||G.end)return;const r=c.getBoundingClientRect(),x=(e.clientX-r.left)*W/r.width,y=(e.clientY-r.top)*H/r.height,o=G.cards.find(o=>x>=o.x&&x<=o.x+120&&y>=o.y&&y<=o.y+80);if(!o)return;
+  if(tool==1){const other=G.L.slice(G.nxt).concat(G.cards).some(q=>q!==o&&q.s==o.s);G.cards=G.cards.filter(q=>q!==o);op();if(o.k=='ok'&&!other){G.log.lost++;say('That report looked fine. Throwing away good readings leaves the machine with less data.',false)}else say('Thrown away! The machine will never see that report.')}
+  else if(o.t===null){const v=G.acc.map(a=>a.v).filter(a=>a>0&&a<60);o.t=v.length?Math.round(med(v)):25;op();say(`Gap patched with a typical reading (${o.t}°C).`)}else say('Nothing to patch: this card already has a reading.',false)};
+ start();loop()}
+
+/* ===== STAGE 3: Data Organization: group falling cards into their columns ===== */
+const PD=[['Asha','27 yrs','Pune','31°C'],['Ben','34 yrs','Delhi','22°C'],['Chen','41 yrs','Goa','29°C'],['Dia','23 yrs','Kochi','33°C']];
+function s3(el){el.innerHTML=`<div class="card"><b>Group the data into columns.</b><p>Cards will fall from the top. Each card is one piece of information. Steer it into the column for its kind: <b>Name</b> with names, <b>Age</b> with ages, <b>City</b> with cities and <b>Temp</b> with temperatures.</p><p>Controls: ◀ ▶ (or A / D) to move, hold ▼ to drop faster. You have 3 lives.</p><button id="go">Start</button></div>`;
+ $('#go').onclick=()=>s3b(el,()=>fin(2,'Shelf built! You grouped every piece of information into its column: names with names, ages with ages, cities with cities and temperatures with temperatures. Each column is one feature and each row is one record. This is DATA ORGANIZATION: a structured dataset.'))}
+/* ===== Shelf builder mini-game (used by stage 3): steer falling cards into column lanes ===== */
+function s3b(el,cb){const P=PD,cols=['Name','Age','City','Temp'],clr=['#35e0c2','#ffcb47','#ff6b81','#a78bfa'],W=480,H=380,K={};
+ el.innerHTML=`<canvas id="cv" width="${W}" height="${H}" style="width:100%;max-width:${W}px;background:#0d1530;border-radius:12px"></canvas><div class="pad"><button data-k="a">◀</button><button data-k="s">▼ Drop</button><button data-k="d">▶</button></div><div class="card" id="tb"></div>`;
+ const c=$('#cv'),g=c.getContext('2d'),T=P.map(()=>Array(4).fill(''));let Q=sh(P.flatMap((r,i)=>r.map((v,j)=>({v,j,i})))),cur=null,lane=1,lives=3,placed=0,over=0;
+ const mv=k=>{if(k=='arrowleft'||k=='a')lane=Math.max(0,lane-1);if(k=='arrowright'||k=='d')lane=Math.min(3,lane+1)};
+ document.onkeydown=e=>{const k=e.key.toLowerCase();mv(k);K[k]=1;if(k.startsWith('arrow'))e.preventDefault()};document.onkeyup=e=>K[e.key.toLowerCase()]=0;
+ const pad=el.querySelector('.pad');pad.onpointerdown=e=>{const k=e.target.dataset.k;if(!k)return;mv(k);if(k=='s')K.s=1};pad.onpointerup=pad.onpointerleave=()=>K.s=0;
+ const tb=()=>$('#tb').innerHTML=`<b>Your table: ${placed}/16 cells filled</b> (each colour is one record)<table><tr>${cols.map(x=>`<th>${x}</th>`).join('')}</tr>${T.map((r,i)=>`<tr>${r.map(v=>`<td style="color:${clr[i]}">${v||'·'}</td>`).join('')}</tr>`).join('')}</table>`;
+ const draw=()=>{g.clearRect(0,0,W,H);g.fillStyle='rgba(53,224,194,.12)';g.fillRect(lane*120,0,120,320);g.strokeStyle='#2a3558';for(let i=1;i<4;i++){g.beginPath();g.moveTo(i*120,0);g.lineTo(i*120,320);g.stroke()}
+  g.setLineDash([6,6]);g.strokeStyle='#556';g.beginPath();g.moveTo(0,316);g.lineTo(W,316);g.stroke();g.setLineDash([]);
+  cols.forEach((n,i)=>{g.fillStyle='#1e2a52';g.fillRect(i*120+4,326,112,44);g.fillStyle='#eaf0ff';g.font='bold 16px sans-serif';g.textAlign='center';g.fillText(n,i*120+60,354)});
+  g.textAlign='left';g.font='bold 15px sans-serif';g.fillStyle='#eaf0ff';g.fillText('Lives '+'❤'.repeat(Math.max(0,lives)),8,22);
+  if(cur){const x=lane*120+10;g.fillStyle='#e8f0ff';g.fillRect(x,cur.y,100,44);g.fillStyle=clr[cur.i];g.beginPath();g.arc(x+14,cur.y+22,7,0,6.3);g.fill();g.fillStyle='#12204a';g.font='bold 16px sans-serif';g.fillText(cur.v,x+28,cur.y+28)}};
+ const loop=()=>{if(!c.isConnected)return;if(!paused&&!over){if(!cur&&Q.length)cur={...Q.shift(),y:-44};
+  if(cur){cur.y+=1.4+placed*.1+(K.arrowdown||K.s?5:0);if(cur.y>=270){
+   if(lane==cur.j){T[cur.i][cur.j]=cur.v;placed++;op();tb();say(`Filled! "${cur.v}" is a ${cols[cur.j]}. Each column is a feature and each row is one record.`)}
+   else{lives--;say(`Wrong column: "${cur.v}" is a ${cols[cur.j]}, not a ${cols[lane]}. The card goes back into the pile.`,false);Q.push({v:cur.v,j:cur.j,i:cur.i})}
+   cur=null;if(placed==16){over=1;cb()}else if(lives<=0){over=1;$('#fb').innerHTML='<div class="toast bad">The shelf collapsed! Too many misfiled cards.<br><button onclick="stage(2)">Try again</button></div>'}}}}
+  draw();requestAnimationFrame(loop)};
+ tb();say('Cards are falling! Steer each into the lane of the column it belongs to (◀ ▶ or A / D). Hold ▼ to drop faster.');loop()}
+
+/* ===== STAGE 4: Exploratory Data Analysis ===== */
+function s4(el){const C=sh(['Aria','Bolt','Cairo','Dune','Echo','Flux','Gale','Haven']).slice(0,7).map(n=>({n,t:ri(18,34),r:ri(20,120),p:ri(5,90)}));C[ri(0,6)].p=ri(250,300);
+ const top=k=>C.reduce((a,b)=>b[k]>a[k]?b:a).n,mp=med(C.map(c=>c.p)),odd=C.reduce((a,b)=>Math.abs(b.p-mp)>Math.abs(a.p-mp)?b:a).n;
+ const Q=[['Which city is the hottest?',top('t')],['Which city gets the most rain?',top('r')],['Which city has an unusual population?',odd]],L={t:'Temperature °C',r:'Rain mm',p:'Population (thousands)'};let q=0,uses=0,res='Pick a column and a tool.';
+ const draw=()=>{el.innerHTML=`<div class="card"><b>Clue ${q+1}/3: ${Q[q][0]}</b><br>Column: <select id="col">${Object.keys(L).map(k=>`<option value="${k}">${L[k]}</option>`).join('')}</select> ${['Min','Max','Average','Frequency'].map(t=>`<button class="g" data-t="${t}">${t}</button>`).join('')}<p id="res">${res}</p></div><table><tr><th>City</th><th>Temp</th><th>Rain</th><th>Pop.</th><th></th></tr>${C.map(c=>`<tr><td>${c.n}</td><td>${c.t}</td><td>${c.r}</td><td>${c.p}</td><td><button data-n="${c.n}">This one</button></td></tr>`).join('')}</table>`};
+ el.onclick=e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.t){const k=$('#col').value,v=C.map(c=>c[k]),a=mean(v),t=b.dataset.t;uses++;
+   res=t=='Min'?`Min of ${L[k]} = ${Math.min(...v)} (${C.find(c=>c[k]==Math.min(...v)).n})`:t=='Max'?`Max of ${L[k]} = ${Math.max(...v)} (${C.find(c=>c[k]==Math.max(...v)).n})`:t=='Average'?`Average of ${L[k]} = ${v.reduce((x,y)=>x+y,0)} ÷ ${v.length} = ${a.toFixed(1)}`:`${v.filter(x=>x>a).length} of ${v.length} cities are above the average (${a.toFixed(1)}).`;draw();return}
+  if(b.dataset.n){if(uses<2)return say('Use the analysis tools at least twice before naming a suspect.',false);
+   if(b.dataset.n!=Q[q][1])return say('Not this one. Check min, max and average to look for the pattern.',false);uses=0;q++;res='Pick a column and a tool.';
+   q<3?(draw(),say('Clue solved! Exploring data with summaries (min, max, average) reveals patterns and unusual values. This is EXPLORATORY DATA ANALYSIS.')):fin(3,'Case closed! Exploring data with summaries reveals patterns and unusual values. This is EXPLORATORY DATA ANALYSIS.')}};draw()}
+
+/* ===== STAGE 5: Data Visualization ===== */
+function chart(t,d){const V=d.map(x=>x.v),mx=Math.max(...V),n=V.length,w=420,h=170;
+ if(t=='pie'){let a=0;const tot=V.reduce((x,y)=>x+y,0);return '<svg viewBox="0 0 330 200" width="330">'+V.map((v,i)=>{const b=a+v/tot*6.2832,x1=110+80*Math.sin(a),y1=100-80*Math.cos(a),x2=110+80*Math.sin(b),y2=100-80*Math.cos(b),big=b-a>3.1416?1:0;a=b;return `<path d="M110 100L${x1} ${y1}A80 80 0 ${big} 1 ${x2} ${y2}Z" fill="hsl(${i*55},70%,55%)"/><text x="215" y="${25+i*20}">■ ${d[i].l}: ${v}</text>`}).join('')+'</svg>'}
+ const X=i=>40+i*(w-60)/n+(w-60)/n/2,Y=v=>180-v/mx*h;let s=`<svg viewBox="0 0 ${w} 200" width="${w}"><line x1="30" x2="${w}" y1="180" y2="180" stroke="#556"/>`;
+ if(t=='bar')s+=V.map((v,i)=>`<rect x="${X(i)-14}" y="${Y(v)}" width="28" height="${180-Y(v)}" fill="#35e0c2"/>`).join('');else s+=`<polyline fill="none" stroke="#ffcb47" stroke-width="3" points="${V.map((v,i)=>X(i)+','+Y(v)).join(' ')}"/>`+V.map((v,i)=>`<circle cx="${X(i)}" cy="${Y(v)}" r="4" fill="#ffcb47"/>`).join('');
+ return s+d.map((x,i)=>`<text x="${X(i)}" y="195" text-anchor="middle">${x.l}</text>`).join('')+'</svg>'}
+function s5(el){
+ const SC=[
+  {t:'Temperature during a day',u:'°C',d:[['6 am',18],['9 am',22],['12 pm',29],['3 pm',32],['6 pm',26],['9 pm',21]],g:'Show how the temperature CHANGED through the day.',k:'line',need:'change over time',why:'The data follows time (6 am to 9 pm), and a line chart joins the points so you can see the temperature rise and fall.'},
+  {t:'Website visitors this week',u:'',d:[['Mon',120],['Tue',150],['Wed',170],['Thu',160],['Fri',210],['Sat',260]],g:'Show the TREND of visitors from Monday to Saturday.',k:'line',need:'change over time',why:'Days are in order, so a line chart makes the trend (going up) easy to see.'},
+  {t:'Maths marks of five students',u:'',d:[['Asha',78],['Ben',65],['Chen',90],['Dia',55],['Eli',82]],g:'COMPARE the marks of the different students.',k:'bar',need:'comparing separate amounts',why:'Each student is a separate category. Bars side by side make it easy to see who scored more or less.'},
+  {t:'Goals scored by five teams',u:'',d:[['Reds',14],['Blues',9],['Greens',17],['Golds',11],['Whites',6]],g:'COMPARE how many goals each team scored.',k:'bar',need:'comparing separate amounts',why:'The teams are separate categories, so the height of each bar compares them clearly.'},
+  {t:'How a student spends 100 rupees of pocket money',u:' ₹',d:[['Food',40],['Travel',20],['Books',15],['Fun',25]],g:'Show what SHARE of the whole 100 rupees each part takes.',k:'pie',need:'parts of a whole',why:'The four parts add up to one whole (100 rupees), and a pie chart shows each slice as a share of that whole.'},
+  {t:'Favourite sport in a class of 30',u:'',d:[['Cricket',12],['Football',8],['Kabaddi',6],['Chess',4]],g:'Show what SHARE of the class chose each sport.',k:'pie',need:'parts of a whole',why:'Every student chose one sport, so the slices add up to the whole class and a pie chart shows each share.'}];
+ const gen={bar:'A bar chart compares separate amounts side by side.',line:'A line chart shows how something changes over time.',pie:'A pie chart shows how parts share one whole.'},ic={bar:'📊',line:'📈',pie:'🥧'};
+ const R=sh(SC).map(x=>({...x,d:x.d.map(y=>({l:y[0],v:y[1]}))})),n=R.length;let ci=0,wrong=0;
+ const draw=()=>{const q=R[ci];el.innerHTML=`<div class="bar"><i style="width:${ci/n*100}%"></i></div><div class="card"><b>Round ${ci+1}/${n}: ${q.t}</b><div style="overflow-x:auto"><table style="width:auto"><tr>${q.d.map(x=>`<th>${x.l}</th>`).join('')}</tr><tr>${q.d.map(x=>`<td>${x.v}${q.u}</td>`).join('')}</tr></table></div><p><b>Goal:</b> ${q.g}</p><p>Here is the data. Which chart is the best fit?</p>${['bar','line','pie'].map(c=>`<button class="chip" data-a="${c}">${ic[c]} ${c} chart</button>`).join('')}<button class="g" data-h="1">Hint</button></div><div id="pv"></div>`};
+ el.onclick=e=>{const b=e.target.closest('button');if(!b)return;const q=R[ci];
+  if(b.dataset.h)return say('Bar chart = compare amounts. Line chart = change over time. Pie chart = share of a whole.');
+  if(b.dataset.n){ci++;draw();$('#fb').innerHTML='';return}
+  if(!b.dataset.a)return;
+  if(b.dataset.a!=q.k){wrong++;op();$('#pv').innerHTML=`<div class="card">This is how a <b>${b.dataset.a} chart</b> would look for this data:<div style="overflow-x:auto">${chart(b.dataset.a,q.d)}</div></div>`;return say(`Not the best fit. ${gen[b.dataset.a]} This goal is about <b>${q.need}</b>. Try another chart.`,false)}
+  op();const last=ci==n-1;
+  el.innerHTML=`<div class="bar"><i style="width:${(ci+1)/n*100}%"></i></div><div class="card"><b>Round ${ci+1}/${n}: ${q.t}</b><p>✅ Best fit: <b>${ic[q.k]} ${q.k} chart</b>. ${q.why}</p><div style="overflow-x:auto">${chart(q.k,q.d)}</div>${last?'':'<button data-n="1">Next round</button>'}</div>`;
+  if(last)fin(4,`All ${n} charts chosen! You made ${wrong} wrong choice${wrong==1?'':'s'}. Bar charts compare amounts, line charts show change over time and pie charts show parts of a whole. Choosing the right chart is the heart of DATA VISUALIZATION.`);else say('Right choice!')};draw()}
+
+/* ===== STAGE 6: Statistics ===== */
+function s6(el){const V=[4,8,6,12,8,2,10],g=[0,0];el.innerHTML=V.map((v,i)=>`<label>💎${i+1} <input type="range" min="0" max="30" value="${v}" data-i="${i}"> <b id="v${i}">${v}</b></label><br>`).join('')+'<div class="card" id="r"></div>';
+ const up=()=>{const m=mean(V),va=vr(V);$('#r').innerHTML=`Values: ${V.join(', ')}<br>Mean = ${V.reduce((a,b)=>a+b,0)} ÷ 7 = <b>${m.toFixed(2)}</b><br>Median (middle value) = <b>${med(V)}</b> | Mode (most common) = <b>${mode(V)}</b><br>Variance (average squared distance from the mean) = <b>${va.toFixed(2)}</b><br>Mission A: mean about 12 (±0.5) with variance ≤ 3 ${g[0]?'✅':'⬜'}<br>Mission B: mean about 12 (±0.5) with variance ≥ 60 ${g[1]?'✅':'⬜'}`;
+  if(Math.abs(m-12)<=.5){if(va<=3&&!g[0]){g[0]=1;say('Mission A done! Same mean, tightly clustered values: low variance.')}if(va>=60&&!g[1]){g[1]=1;say('Mission B done! Same mean, widely spread values: high variance.')}}
+  if(g[0]&&g[1])fin(5,'Two datasets with the same mean can look very different. Mean, median and mode describe the centre; variance describes the spread.')};
+ el.oninput=e=>{const i=e.target.dataset.i;if(i===undefined)return;V[i]=+e.target.value;$('#v'+i).textContent=V[i];op();up()};up()}
+
+/* ===== STAGE 7: Machine Learning (k-nearest neighbours) ===== */
+function s7(el){let pool=Array.from({length:14},(_,i)=>fr(i%2)),tr=[],te=Array.from({length:10},(_,i)=>fr(i%2)),res=null;
+ const draw=()=>{el.innerHTML=`<p>Click fruits to feed the robot labelled examples, then train it.</p><div>${pool.map((f,i)=>`<button class="chip" data-p="${i}">${nm(f)} ${f.w}g, redness ${f.c}</button>`).join('')}</div><p>Training examples: <b>${tr.length}</b> (${tr.filter(f=>f.y).length} oranges, ${tr.filter(f=>!f.y).length} apples)</p><button data-t="1">Train and test the robot</button><button class="g" data-m="1">More fruit</button>`+(res?`<div class="card"><b>Predictions on 10 NEW fruits:</b><table>${res.map(r=>`<tr><td>${r.f.w}g, ${r.f.c}</td><td>Robot: ${nm({y:r.p})}</td><td>Actual: ${nm(r.f)}</td><td>${r.p==r.f.y?'✅':'❌'}</td></tr>`).join('')}</table><b>Accuracy: ${Math.round(res.filter(r=>r.p==r.f.y).length*10)}%</b></div>`:'')};
+ el.onclick=e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.p){tr.push(pool.splice(+b.dataset.p,1)[0]);op();draw();say('Example added. A machine learning model learns patterns from labelled examples.')}
+  else if(b.dataset.m){pool.push(...Array.from({length:6},(_,i)=>fr(i%2)));draw()}
+  else if(b.dataset.t){if(tr.length<4||!tr.some(f=>f.y)||tr.every(f=>f.y))return say('Feed at least 4 examples that include both apples and oranges.',false);
+   res=te.map(f=>({f,p:knn(tr,f,3)}));const a=res.filter(r=>r.p==r.f.y).length*10;M.train=[...tr];S.acc=Math.max(S.acc,a);draw();
+   a>=80?fin(6,`The robot reached ${a}% on fruit it has never seen. MACHINE LEARNING finds patterns in examples (here k-nearest neighbours) and uses them to predict.`):say(`Accuracy ${a}%. Add more varied examples and train again to reach 80%.`,false)}};draw()}
+
+/* ===== STAGE 8: Model Evaluation ===== */
+function s8(el){if(M.train.length<4)M.train=Array.from({length:8},(_,i)=>fr(i%2));const te=Array.from({length:40},(_,i)=>fr(i%2)),seen={};let k=3,H=[];
+ const run=()=>{const P=te.map(f=>knn(M.train,f,k)),c=(a,p)=>te.filter((f,i)=>f.y==a&&P[i]==p).length,TP=c(1,1),FN=c(1,0),FP=c(0,1),TN=c(0,0),acc=Math.round((TP+TN)/te.length*100);seen[k+'-'+M.train.length]=1;H.push(`k=${k}, ${M.train.length} training examples: ${acc}%`);S.acc=Math.max(S.acc,acc);op();
+  el.innerHTML=`<p>Test the robot on 40 unseen fruits. Change k (how many neighbours vote) or add training data, then compare.</p>${[1,3,5,9,15].map(x=>`<button class="${x==k?'on':'g'}" data-k="${x}">k=${x}</button>`).join('')}<button data-add="1">+10 training examples</button><div class="card"><table><tr><th></th><th>Predicted orange</th><th>Predicted apple</th></tr><tr><td>Actual orange</td><td>${TP} (true positive)</td><td>${FN} (false negative)</td></tr><tr><td>Actual apple</td><td>${FP} (false positive)</td><td>${TN} (true negative)</td></tr></table><b>Accuracy = (${TP}+${TN}) ÷ 40 = ${acc}%</b></div><div class="card">History:<br>${H.join('<br>')}</div>`;
+  Object.keys(seen).length>=3?fin(7,`You compared ${Object.keys(seen).length} model settings. A false positive calls an apple an orange, a false negative misses an orange. MODEL EVALUATION on unseen data tells you whether to trust predictions.`):say('Predictions must be checked against the truth. Try another setting to compare.')};
+ el.onclick=e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.k)k=+b.dataset.k;if(b.dataset.add)M.train.push(...Array.from({length:10},(_,i)=>fr(i%2)));run()};run()}
+
+/* ===== STAGE 9: Overfitting and underfitting ===== */
+function s9(el){const gen=n=>Array.from({length:n},()=>{const x=Math.random(),y=Math.random();let l=x+y>1?1:0;if(Math.random()<.15)l=1-l;return{x,y,l}}),TR=gen(70),TE=gen(70),KS=[69,45,31,21,13,7,5,3,2,1];
+ const pr=(p,k)=>{const s=TR.map(q=>({d:(q.x-p.x)**2+(q.y-p.y)**2,l:q.l})).sort((a,b)=>a.d-b.d).slice(0,k);return s.reduce((a,b)=>a+b.l,0)*2>k?1:0},ac=(D,k)=>D.filter(p=>pr(p,k)==p.l).length/D.length;
+ const R=KS.map(k=>({tr:ac(TR,k),te:ac(TE,k)})),best=Math.max(...R.map(r=>r.te)),seen=new Set();
+ el.innerHTML='<p>Complexity: <b id="cv">1</b> (1 = very simple, 10 = memorises everything)</p><input type="range" id="c" min="1" max="10" value="1"><div class="card" id="o"></div><button id="lk" disabled>Lock in this model</button> <span id="nd">Try 3 different settings first.</span>';
+ const up=()=>{const c=+$('#c').value,r=R[c-1];seen.add(c);$('#cv').textContent=c;$('#o').innerHTML=`Training accuracy: <b>${Math.round(r.tr*100)}%</b> | Testing accuracy: <b>${Math.round(r.te*100)}%</b><br>${[...seen].sort((a,b)=>a-b).map(i=>`Complexity ${i}: train ${Math.round(R[i-1].tr*100)}%, test ${Math.round(R[i-1].te*100)}%`).join('<br>')}`;
+  say(c<=2?'Too simple: the model misses the pattern (UNDERFITTING).':c>=9?'Training accuracy is perfect but test accuracy drops: the model memorised noise (OVERFITTING).':'Balanced models do well on both training and test data.');if(seen.size>=3){$('#lk').disabled=false;$('#nd').hidden=true}};
+ $('#c').oninput=up;up();$('#lk').onclick=()=>{const c=+$('#c').value;R[c-1].te>=best-.05?fin(8,`Test accuracy ${Math.round(R[c-1].te*100)}% is close to the best possible (${Math.round(best*100)}%). A good model learns general patterns instead of memorising training data.`):say(`Test accuracy ${Math.round(R[c-1].te*100)}% but the best setting reaches ${Math.round(best*100)}%. Compare train and test accuracy and try again.`,false)}}
+
+/* ===== STAGE 10: Final mission: full data science workflow ===== */
+function s10(el){let H=[],st=0,out='',acc=0,tr=[],te=[],mp=0;const N=['Collect','Clean','Organize','Analyze','Visualize','Train','Evaluate','Decide'];
+ const k5=s=>[...tr].sort((a,b)=>Math.abs(a.s-s)-Math.abs(b.s-s)).slice(0,5).reduce((a,b)=>a+b.c,0)>=3?1:0;
+ const F=[
+ ()=>{H=Array.from({length:50},(_,i)=>{const s=ri(40,200);return{id:i+1,s,p:Math.round(2*s+nr(0,25))}});[3,9,15,20].forEach(i=>H[i].s=null);[5,25,33].forEach(i=>H[i].s=pk([-10,9999]));[7,30,44].forEach(i=>H.push({...H[i]}));op();return[1,`Collected ${H.length} house records (size m², price lakh). Some look suspicious.`]},
+ ()=>{const a=$('#c1').checked,b=$('#c2').checked,c=$('#c3').checked,n=H.length;let X=H;if(a){const s=new Set();X=X.filter(h=>!s.has(h.id)&&s.add(h.id))}if(b)X=X.filter(h=>h.s!==null);if(c)X=X.filter(h=>h.s===null||(h.s>0&&h.s<1000));
+  const bad=X.filter(h=>h.s===null||h.s<=0||h.s>1000).length+X.length-new Set(X.map(h=>h.id)).size;if(bad)return[0,`${bad} problem records remain. Tick every cleaning rule.`];H=X;op();return[1,`Cleaning: ${n} → ${H.length} records.`]},
+ ()=>{mp=med(H.map(h=>h.p));H.forEach(h=>h.c=h.p>mp?1:0);op();return[1,`Organized into a table. New feature: class = Expensive if price > median (${mp}).<table><tr><th>ID</th><th>Size</th><th>Price</th><th>Class</th></tr>${H.slice(0,4).map(h=>`<tr><td>${h.id}</td><td>${h.s}</td><td>${h.p}</td><td>${h.c?'Expensive':'Affordable'}</td></tr>`).join('')}</table>`]},
+ ()=>{const x=H.map(h=>h.s),y=H.map(h=>h.p),mx=mean(x),my=mean(y),r=x.reduce((a,v,i)=>a+(v-mx)*(y[i]-my),0)/Math.sqrt(x.reduce((a,v)=>a+(v-mx)**2,0)*y.reduce((a,v)=>a+(v-my)**2,0));return[1,`Average price ${my.toFixed(1)}. Correlation between size and price: r = ${r.toFixed(2)}. Bigger houses tend to cost more.`]},
+ ()=>{const my=Math.max(...H.map(h=>h.p));return[1,`<svg viewBox="0 0 440 200" width="440">${H.map(h=>`<circle cx="${30+(h.s-40)/160*390}" cy="${185-h.p/my*170}" r="4" fill="${h.c?'#ff6b81':'#35e0c2'}"/>`).join('')}<text x="200" y="198">size →</text></svg><br>The scatter plot shows the pattern: bigger houses are pricier.`]},
+ ()=>{const s=sh(H),n=Math.round(s.length*.7);tr=s.slice(0,n);te=s.slice(n);op();return[1,`Trained a k-nearest-neighbours model on ${tr.length} houses and kept ${te.length} aside for testing.`]},
+ ()=>{acc=te.filter(h=>k5(h.s)==h.c).length/te.length;S.acc=Math.max(S.acc,Math.round(acc*100));return[1,`Accuracy on unseen houses: ${Math.round(acc*100)}%.`]}];
+ const draw=()=>{el.innerHTML=`<div class="bar"><i style="width:${st/8*100}%"></i></div>`+(st<8?`<div class="card"><b>Step ${st+1}/8: ${N[st]}</b>${st==1?'<br><label><input type="checkbox" id="c1"> remove duplicate ids</label> <label><input type="checkbox" id="c2"> drop missing sizes</label> <label><input type="checkbox" id="c3"> drop impossible sizes</label>':''}<br>${st==7?`<p>Rule of thumb: deploy only if accuracy is at least 80%. Yours: ${Math.round(acc*100)}%.</p><button data-d="1">Deploy the model</button><button data-d="0">Collect more data first</button>`:'<button data-go="1">Run this step</button>'}</div>`:'')+`<div class="card">${out||'Pipeline log appears here.'}</div>`};
+ el.onclick=e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.go){const[ok,t]=F[st]();if(!ok)return say(t,false);out+=`<p><b>${N[st]}:</b> ${t}</p>`;st++;draw();say(`${N[st-1]} complete. Each step builds on the previous one.`)}
+  if(b.dataset.d){const good=acc>=.8;if((b.dataset.d=='1')!=good)return say(good?'The model scored above 80%, so it is reliable enough to deploy.':'Accuracy is below 80%. Collecting more data first is the safer decision.',false);fin(9,`Decision made from evidence (${Math.round(acc*100)}% accuracy). You completed the whole data science workflow: collect, clean, organize, analyze, visualize, train, evaluate and decide.`)}};draw()}
+
+/* ===== Stage table (also feeds How to Play and Glossary) ===== */
+const ST=[
+{n:'The Treasure Collector',c:'Data Collection',o:'Walk with arrow keys, WASD or the on-screen pad. Collect 10 relevant observations (🍎 🌡️ 🦊) and ignore junk.',l:'Collecting relevant observations builds a dataset.',r:'Weather stations, surveys and sensors collect data.',run:s1},
+{n:'The Data Repair Factory',c:'Data Cleaning',o:'Reports roll along a belt into the Weather Machine. Click cards to throw them away or patch them (tool buttons or keys 1 and 2) so the needle ends in the green zone. 3 rounds, 3 lives.',l:'Raw data has missing, repeated and impossible values that must be fixed before analysis.',r:'Analysts spend much of their time cleaning data.',run:s2},
+{n:'The Table Builder',c:'Data Organization',o:'Cards fall from the top. Steer each card (◀ ▶ or A/D, hold ▼ to drop faster) into the column it belongs to: names with names, ages with ages, cities with cities, temperatures with temperatures.',l:'Rows are records, columns are features, and structured tables make analysis possible.',r:'Spreadsheets and databases store structured data.',run:s3},
+{n:'The Mystery Detective',c:'Exploratory Data Analysis',o:'Use min, max, average and frequency tools on columns, then name the city that answers each clue.',l:'Summaries reveal patterns, trends and unusual values.',r:'Analysts explore data before building any model.',run:s4},
+{n:'The Chart Creator',c:'Data Visualization',o:'You are given 6 sets of data, each with a goal. Pick the chart that suits the data (bar, line or pie) and see the chart drawn for you.',l:'Charts turn numbers into pictures; each chart type suits a different question.',r:'Dashboards and reports use charts to communicate.',run:s5},
+{n:'The Number Lab',c:'Statistics',o:'Drag the sliders on seven number crystals to hit mean and variance targets.',l:'Mean, median and mode describe the centre; variance describes the spread.',r:'Statistics summarise exam scores, incomes and test results.',run:s6},
+{n:'Train the Robot',c:'Machine Learning',o:'Feed labelled fruit examples, train the robot and test it on new fruit (needs 80% accuracy).',l:'A model learns patterns from examples (here k-nearest neighbours) and predicts new cases.',r:'Spam filters and recommendations learn from examples.',run:s7},
+{n:'The Prediction Arena',c:'Model Evaluation',o:'Test the model on 40 unseen fruits, change k, add training data and compare three settings.',l:'Accuracy, false positives and false negatives show whether predictions can be trusted.',r:'Medical and fraud models are always evaluated before use.',run:s8},
+{n:'The Balance Challenge',c:'Overfitting and Underfitting',o:'Slide model complexity, compare training and testing accuracy, then lock the best model.',l:'Too simple underfits, too complex overfits; a good model works on new data.',r:'Models that only memorise fail on real-world data.',run:s9},
+{n:'Restore DATA CITY',c:'The Data Science Workflow',o:'Run the 8-step pipeline: collect, clean, organize, analyze, visualize, train, evaluate, decide.',l:'Real projects combine every earlier skill and end with an evidence-based decision.',r:'Every data science project follows this workflow.',run:s10}];
+
+/* ===== Final report ===== */
+function end(){document.onkeydown=null;const mm=Math.floor(S.time/60000),ss=Math.floor(S.time/1000)%60;
+ app.innerHTML=`<div class="card" style="text-align:center"><div class="big">🏆</div><h1>DATA SCIENCE MASTER</h1><p>The DATA CORE is restored and DATA CITY is bright again!</p></div>
+ <div class="card"><h3>Mission report</h3><table><tr><td>Stages completed</td><td>${Object.keys(S.done).length}/10</td></tr><tr><td>Time taken</td><td>${mm} min ${ss} s</td></tr><tr><td>Score</td><td>${S.coins} coins, ${S.xp} XP</td></tr><tr><td>Dataset transformations</td><td>${S.ops}</td></tr><tr><td>Best ML accuracy</td><td>${S.acc}%</td></tr><tr><td>Concepts mastered</td><td>${ST.filter((s,i)=>S.done[i]).map(s=>s.c).join(', ')}</td></tr><tr><td>Badges</td><td>${S.badges.join(', ')}</td></tr></table></div>
+ <div class="card"><h3>Reflection</h3><p>What did you discover while playing?</p><textarea id="rf" rows="3" style="width:100%">${S.rf}</textarea><h3>Rate the game</h3><select id="rt">${[5,4,3,2,1].map(n=>`<option ${S.rate==n?'selected':''}>${n}</option>`).join('')}</select> / 5<br><br><textarea id="cm" rows="2" style="width:100%" placeholder="Comments">${S.cm}</textarea><br><button onclick="S.rf=$('#rf').value;S.cm=$('#cm').value;S.rate=+$('#rt').value;save();this.textContent='Saved ✔'">Save feedback</button></div>
+ <div class="card"><h3>Glossary</h3>${ST.map(s=>`<p><b>${s.c}:</b> ${s.l}</p>`).join('')}</div><button onclick="map()">Back to stages</button>`}
+menu();
+</script></body></html>
