@@ -31,9 +31,25 @@ Then choose Kernel > Restart and Run All. The random seed is fixed (42), so resu
 10. Error analysis
 11. Limitations and next steps
 
-## Results
-(Paste your final comparison table here, then 1-2 lines of summary, for example the best model and its PR-AUC and recall.)
 
+## Results
+
+Cross-validation on the training data (mean ± std):
+
+| Model | ROC-AUC | PR-AUC | Recall | Precision | F2 |
+|---|---|---|---|---|---|
+| Baseline (majority) | 0.500 ± 0.000 | 0.066 ± 0.002 | 0.000 | 0.000 | 0.000 |
+| Logistic Regression | 0.654 ± 0.064 | 0.155 ± 0.049 | 0.249 ± 0.117 | 0.150 ± 0.067 | 0.219 ± 0.099 |
+| SVM (RBF) | 0.664 ± 0.060 | 0.181 ± 0.037 | 0.000 | 0.000 | 0.000 |
+| Random Forest | 0.711 ± 0.066 | 0.194 ± 0.075 | 0.000 | 0.000 | 0.000 |
+
+Test set (tuned SVM, C = 100, gamma = 0.0001, threshold = 0.05):
+
+- ROC-AUC 0.693, PR-AUC 0.155 (random guess = 0.067)
+- Fail recall 0.24, Fail precision 0.18
+- Confusion matrix: TN = 270, FP = 23, FN = 16, TP = 5
+
+All models beat the baseline, but the sensors only weakly predict failures, so the problem remains difficult.
 ## Limitations
 - Only about 21 fails in the test set, so metrics are noisy.
 - A random split may be optimistic because wafers are time-ordered.
